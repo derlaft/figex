@@ -96,6 +96,7 @@ func Cycle(a []string, state AsmState) error {
     _, has = Returning[op]
     if !has && args.R == nil {
         state.Reg[RF] |= (1 << F_FAULT)
+        //@TODO: destroy stack pointer
         return nil
     }
 
