@@ -102,13 +102,11 @@ func ror(s *State, p Orgex) {
 }
 
 func rсl(s *State, p Orgex) {
-    var buf = p.A >> 7
-    *p.R = s.result(int(p.A << 1) | int(buf))
+    *p.R = s.result(int(p.A << 1) | int(p.A >> 7))
 }
 
 func rcr(s *State, p Orgex) {
-    var buf = p.A << 7
-    *p.R = s.result(int(p.A >> 1) | int(buf))
+    *p.R = s.result(int(p.A >> 1) | int(p.A << 7))
 }
 
 func mov(s *State, p Orgex) {
