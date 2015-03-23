@@ -29,15 +29,16 @@ type Orgex struct {
 type Instruction func(*State,Orgex)
 
 func (s *State) result(result int) byte {
+    if result < 0 {
+        result = -result
+        s.Reg[RF] |= (1 << F_FAULT)
+    }
+
     if result > 0xFF {
         result = result & 0xFF
         s.Reg[RF] |= (1 << F_OVER)
     }
 
-    if result < 0 {
-        result = -result
-        s.Reg[RF] |= (1 << F_FAULT)
-    }
 
     if result == 0 {
         s.Reg[RF] |= (1 << F_ZERO)
@@ -100,7 +101,7 @@ func Ror(s *State, p Orgex) {
     *p.R = s.result(int(p.A >> 1))
 }
 
-func Rсl(s *State, p Orgex) {
+func Rcl(s *State, p Orgex) {
     *p.R = s.result(int(p.A << 1) | int(p.A >> 7))
 }
 
