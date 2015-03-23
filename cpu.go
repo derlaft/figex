@@ -1,4 +1,4 @@
-package figex
+package cpu
 
 type State struct {
     Reg [16]byte
@@ -69,8 +69,12 @@ func mul(s *State, p Orgex) {
 }
 
 func div(s *State, p Orgex) {
-    *p.R = s.result(int(p.A) / int(p.B))
-    s.Reg[RA] = (byte) (int(p.A) % int(p.B))
+    if p.B != 0 {
+        *p.R = byte(int(p.A) / int(p.B))
+        s.Reg[RA] = (byte) (int(p.A) % int(p.B))
+    } else {
+        s.Reg[RF] |= (1 << F_FAULT)
+    }
 }
 
 func and(s *State, p Orgex) {
@@ -110,13 +114,21 @@ func st(s *State, p Orgex) {
 }
 
 func push(s *State, p Orgex) {
-    s.Mem[s.Reg[RE]] = p.A
-    s.Reg[RE] = s.result(int(s.Reg[RE]) + 1)
+    if s.Reg[RE] < 128 || s.Reg[RE] > 128 + 64 {
+        s.Reg[RF] |= (1 << F_FAULT)
+    } else {
+        s.Mem[s.Reg[RE]] = p.A
+        s.Reg[RE] = byte(int(s.Reg[RE]) + 1)
+    }
 }
 
 func pop(s *State, p Orgex) {
-    s.Reg[RE] = s.result(int(s.Reg[RE]) - 1)
-    *p.R = s.result(int(s.Mem[s.Reg[RE]]))
+    if s.Reg[RE] < 128 || s.Reg[RE] > 127 + 64 {
+        s.Reg[RF] |= (1 << F_FAULT)
+    } else {
+        s.Reg[RE] = byte(int(s.Reg[RE]) - 1)
+        *p.R = s.result(int(s.Mem[s.Reg[RE]]))
+    }
 }
 
 
