@@ -18,8 +18,48 @@ type OrgexPut struct {
     used int
 }
 
+// links to instruction subroutines
 var Ops = map[string]Instruction{
     "ADD": Add,
+    "SUB": Sub,
+    "INC": Inc,
+    "DEC": Dec,
+    "MUL": Mul,
+    "DIV": Div,
+    "AND": And,
+    "OR":  Or,
+    "XOR": Xor,
+    "NOT": Not,
+    "ROL": Rol,
+    "ROR": Ror,
+    "RCL": Rcl,
+    "RCR": Rcr,
+    "MOV": Mov,
+    "LD":  Ld,
+    "ST":  St,
+    "PUT": Push,
+    "POP": Pop,
+}
+
+// instruction that need Orgex.R pointer to return value
+var Returning = map[string]bool {
+    "ADD": true,
+    "SUB": true,
+    "INC": true,
+    "DEC": true,
+    "MUL": true,
+    "DIV": true,
+    "AND": true,
+    "OR": true,
+    "XOR": true,
+    "NOT": true,
+    "ROL": true,
+    "ROR": true,
+    "RCL": true,
+    "RCR": true,
+    "MOV": true,
+    "LD": true,
+    "POP": true,
 }
 
 // @TODO: check for interrupts
@@ -51,6 +91,12 @@ func Cycle(a []string, state AsmState) error {
     _, has := Ops[op]
     if !has {
         return errors.New("Unknown instruction")
+    }
+
+    _, has = Returning[op]
+    if !has && args.R == nil {
+        state.Reg[RF] |= (1 << F_FAULT)
+        return nil
     }
 
     state.Reg[RF] = 0
