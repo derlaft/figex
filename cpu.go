@@ -11,8 +11,8 @@ const (
   RB = 11
   RC = 12
   RD = 13
-  RE = 14
-  RF = 15
+  RE = 14 //stack pointer
+  RF = 15 //flag register
 
   F_ZERO = 0
   F_OVER = 1
@@ -20,17 +20,18 @@ const (
   F_INT = 3
 )
 
-type Pair struct {
+type Orgex struct {
     A byte
     B byte
+    R *byte
     used byte
 }
 
-type instruction func(State,Pair)
+type instruction func(State,Orgex)
 
 func (s *State) result(result int) byte {
     if result > 0xFF {
-        result = result % 0xFF
+        result = result & 0xFF
         s.Reg[RF] |= (1 << F_OVER)
     }
 
@@ -47,66 +48,78 @@ func (s *State) result(result int) byte {
 }
 
 
-func add(s State, par Pair) {
-    s.Reg[par.A] = s.result(int(s.Reg[par.A]) + int(s.Reg[par.B]))
+func add(s *State, p Orgex) {
+    *p.R = s.result(int(p.A) + int(p.B))
 }
 
-func sub(s State, par Pair) {
-    s.Reg[par.A] = s.result(int(s.Reg[par.A]) - int(s.Reg[par.B]))
+func sub(s *State, p Orgex) {
+    *p.R = s.result(int(p.A) - int(p.B))
 }
 
-func inc(s State, par Pair) {
-    s.Reg[par.A] = s.result(int(s.Reg[par.A]) + 1)
+func inc(s *State, p Orgex) {
+    *p.R = s.result(int(p.A) + 1)
 }
 
-func dec(s State, par Pair) {
-    s.Reg[par.A] = s.result(int(s.Reg[par.A]) - 1)
+func dec(s *State, p Orgex) {
+    *p.R = s.result(int(p.A) - 1)
 }
 
-func mul(s State, par Pair) {
-    s.Reg[par.A] = s.result(int(s.Reg[par.A]) * int(s.Reg[par.B]))
+func mul(s *State, p Orgex) {
+    *p.R = s.result(int(p.A) * int(p.B))
 }
 
-func div(s State, par Pair) {
-    s.Reg[par.A] = s.result(int(s.Reg[par.A]) / int(s.Reg[par.B]))
-    s.Reg[RA] = (byte) (int(s.Reg[par.A]) % int(s.Reg[par.B]))
+func div(s *State, p Orgex) {
+    *p.R = s.result(int(p.A) / int(p.B))
+    s.Reg[RA] = (byte) (int(p.A) % int(p.B))
 }
 
-func and(s State, par Pair) {
-    s.Reg[par.A] = s.result(int(s.Reg[par.A] & s.Reg[par.B]))
+func and(s *State, p Orgex) {
+    *p.R = s.result(int(p.A & p.B))
 }
 
-func or(s State, par Pair) {
-    s.Reg[par.A] = s.result(int(s.Reg[par.A] | s.Reg[par.B]))
+func or(s *State, p Orgex) {
+    *p.R = s.result(int(p.A | p.B))
 }
 
-func xor(s State, par Pair) {
-    s.Reg[par.A] = s.result(int(s.Reg[par.A] ^ s.Reg[par.B]))
+func xor(s *State, p Orgex) {
+    *p.R = s.result(int(p.A ^ p.B))
 }
 
-func not(s State, par Pair) {
-    s.Reg[par.A] = s.result(int(s.Reg[par.A] ^ 0xFF))
+func not(s *State, p Orgex) {
+    *p.R = s.result(int(p.A ^ 0xFF))
 }
 
-func rol(s State, par Pair) {
-    s.Reg[par.A] = s.result(int(s.Reg[par.A] << 1))
+func rol(s *State, p Orgex) {
+    *p.R = s.result(int(p.A << 1))
 }
 
-func ror(s State, par Pair) {
-    s.Reg[par.A] = s.result(int(s.Reg[par.A] >> 1))
+func ror(s *State, p Orgex) {
+    *p.R = s.result(int(p.A >> 1))
 }
 
-func mov(s State, par Pair) {
-    s.Reg[par.A] = s.Reg[par.B]
+func mov(s *State, p Orgex) {
+    *p.R = p.B
 }
 
-func ld(s State, par Pair) {
-    s.Reg[par.A] = s.Mem[s.Reg[par.B]]
+func ld(s *State, p Orgex) {
+    *p.R = s.Mem[p.B]
 }
 
-func st(s State, par Pair) {
-    s.Mem[s.Reg[par.B]] = s.Reg[par.A]
+func st(s *State, p Orgex) {
+    s.Mem[p.B] = p.A
 }
+
+func push(s *State, p Orgex) {
+    s.Mem[s.Reg[RE]] = p.A
+    s.Reg[RE] = s.result(int(s.Reg[RE]) + 1)
+}
+
+func pop(s *State, p Orgex) {
+    s.Reg[RE] = s.result(int(s.Reg[RE]) - 1)
+    *p.R = s.result(int(s.Mem[s.Reg[RE]]))
+}
+
+
 
 
 
