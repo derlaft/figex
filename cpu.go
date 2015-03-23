@@ -114,7 +114,7 @@ func st(s *State, p Orgex) {
 }
 
 func push(s *State, p Orgex) {
-    if s.Reg[RE] < 128 || s.Reg[RE] > 128 + 64 {
+    if s.Reg[RE] < 128 || s.Reg[RE] > 127 + 64 {
         s.Reg[RF] |= (1 << F_FAULT)
     } else {
         s.Mem[s.Reg[RE]] = p.A
