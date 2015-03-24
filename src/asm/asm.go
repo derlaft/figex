@@ -10,12 +10,18 @@ import (
 type AsmState struct {
     State
     PC int
+
+    //stack for CALL/RET
+    ret [32] int
+    pt byte
+
     Const map[string]int
 }
 
 type OrgexPut struct {
     Orgex
     used int
+    jump int
 }
 
 // links to instruction subroutines
@@ -50,7 +56,7 @@ var Returning = map[string]bool {
     "MUL": true,
     "DIV": true,
     "AND": true,
-    "OR": true,
+    "OR":  true,
     "XOR": true,
     "NOT": true,
     "ROL": true,
@@ -58,9 +64,21 @@ var Returning = map[string]bool {
     "RCL": true,
     "RCR": true,
     "MOV": true,
-    "LD": true,
+    "LD":  true,
     "POP": true,
 }
+
+var Labels = map[string]Macros {
+    "JMP": Jmp,
+    "JZ":  Jz,
+    "JNZ": Jnz,
+    "JO":  Jo,
+    "JNO": Jno,
+    "JF":  Jf,
+    "JNF": Jnf,
+}
+
+type Macros func(*AsmState,OrgexPut)
 
 // @TODO: check for interrupts
 // and implement them ofc :)
@@ -124,11 +142,21 @@ func (org *OrgexPut) pushArg(state AsmState, arg string) error {
             res = byte(number)
         case 'R':
             if number >= 16 {
-                return errors.New("")
+                return errors.New("Nonexistent register usage")
             }
             res = state.Reg[number]
             if org.used == 0 {
                 org.R = &state.Reg[number]
+            }
+       case '_', ':':
+            val, ok := state.Const[arg[1:]]
+            if ok && int(byte(val)) == val && arg[0] == '_' {
+                res = byte(val)
+            } else if ok && arg[0] == ':' {
+                org.jump = val
+                return nil
+            } else {
+                return errors.New("Nonexistend constant usage")
             }
     }
 
@@ -191,3 +219,60 @@ func Preprocess(t []string, state *AsmState) {
 }
 
 
+func Jmp(s *AsmState, p OrgexPut) {
+    s.PC = p.used
+}
+
+func JmpIfFlag(s *AsmState, p OrgexPut, flag uint, rev bool) {
+    if ( (s.Reg[RF] & (1 << flag) > 0) != rev ) {
+        Jmp(s, p)
+    }
+}
+
+func Call(s *AsmState, p OrgexPut) {
+
+    if s.pt == 31 {
+        s.Reg[RF] |= (1 << F_FAULT)
+        return
+    }
+
+    s.pt += 1
+    s.ret[s.pt] = s.PC
+    s.PC = p.jump
+}
+
+func Ret(s *AsmState, p OrgexPut) {
+
+    if s.pt == 0 {
+        s.Reg[RF] |= (1 << F_FAULT)
+        return
+    }
+
+    s.PC = s.ret[s.pt]
+    s.pt -= 1
+}
+
+func Jz(s *AsmState, p OrgexPut) {
+    JmpIfFlag(s, p, F_ZERO, false)
+    s[2]
+}
+
+func Jnz(s *AsmState, p OrgexPut) {
+    JmpIfFlag(s, p, F_ZERO, true)
+}
+
+func Jo(s *AsmState, p OrgexPut) {
+    JmpIfFlag(s, p, F_OVER, false)
+}
+
+func Jno(s *AsmState, p OrgexPut) {
+    JmpIfFlag(s, p, F_OVER, true)
+}
+
+func Jf(s *AsmState, p OrgexPut) {
+    JmpIfFlag(s, p, F_FAULT, false)
+}
+
+func Jnf(s *AsmState, p OrgexPut) {
+    JmpIfFlag(s, p, F_FAULT, true)
+}
