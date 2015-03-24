@@ -11,7 +11,7 @@ type Prog struct {
 
 const MAXLEN = 2048
 
-func Mmap(path string) (p Prog, err error) {
+func ProgFromFile(path string) (p Prog, err error) {
     p.Str = make([]string, 512, MAXLEN)
 
     file, err := os.Open(path)

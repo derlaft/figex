@@ -1,7 +1,7 @@
 package asm
 
 import (
-    . "cpu"
+    . "github.com/derlaft/figex/cpu"
     "strings"
     "strconv"
     "errors"

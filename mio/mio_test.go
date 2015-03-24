@@ -7,7 +7,7 @@ import (
 
 func TestOpen(t *testing.T) {
 
-    prog, err := Mmap("./test.txt")
+    prog, err := ProgFromFile("./test.txt")
     if err != nil {
         fmt.Println(err)
         t.Fail()

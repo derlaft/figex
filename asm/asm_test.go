@@ -1,7 +1,7 @@
 package asm
 
 import (
-    . "mio"
+    . "github.com/derlaft/figex/mio"
     "testing"
     "fmt"
     "strconv"
@@ -21,22 +21,19 @@ func TestTokenize(t *testing.T) {
 }
 
 func TestPreprocess(t *testing.T) {
-    mmap, err := Mmap("./TEST1.PER")
+    prog, err := ProgFromFile("./TEST1.PER")
         if err != nil {
             fmt.Println(err)
             t.Fail()
         }
 
     a := AsmState{}
-    Preprocess(mmap.Str, &a)
+    Preprocess(prog.Str, &a)
 
     fmt.Println("Printing const table")
     for s, i := range a.Const {
         fmt.Println("Const " + s + " is " + strconv.Itoa(i))
     }
-
-
-    defer mmap.Close()
 
 }
 
