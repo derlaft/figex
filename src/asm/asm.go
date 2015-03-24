@@ -1,10 +1,11 @@
-package cpu
+package asm
 
 import (
     . "cpu"
     "strings"
     "strconv"
     "errors"
+    "fmt"
 )
 
 type AsmState struct {
@@ -181,10 +182,16 @@ var (
 )
 
 func tokenize(str string) []string {
-    return strings.Split(strings.Trim(str, " \t"), " \t")
+    return strings.Fields(str)
 }
 
 func argType(t []string) int {
+
+    fmt.Printf("%q\n", t)
+    if len(t) < 1 || len(t[0]) < 1 {
+        return OP_NOP
+    }
+
     first, last := t[0][0], t[0][len(t[0])-1]
     switch {
         case first == '#' && t[0] == "#DEF" && len(t) == 3:
@@ -254,7 +261,6 @@ func Ret(s *AsmState, p OrgexPut) {
 
 func Jz(s *AsmState, p OrgexPut) {
     JmpIfFlag(s, p, F_ZERO, false)
-    s[2]
 }
 
 func Jnz(s *AsmState, p OrgexPut) {
