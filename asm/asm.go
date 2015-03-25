@@ -2,6 +2,7 @@ package asm
 
 import (
     . "github.com/derlaft/figex/cpu"
+    . "github.com/derlaft/figex/mio"
     "strings"
     "strconv"
     "errors"
@@ -84,64 +85,71 @@ type Macros func(*AsmState,OrgexPut)
 // @TODO: check for interrupts
 // and implement them ofc :)
 
-func Cycle(a []string, state AsmState) error {
+func Cycle(p Prog, state *AsmState) error {
 
     var token []string
 
-    for argType(token) != OP_OP && state.PC < len(a) {
-        token = tokenize(a[state.PC])
+    for argType(token) != OP_OP && state.PC < len(p.Str) {
+        token = tokenize(p.Str[state.PC])
         state.PC += 1
     }
 
-    if state.PC >= len(a) {
-        return errors.New("Progam ended")
+    if state.PC > len(p.Str) {
+        return errors.New("Program ended")
     }
 
+    fmt.Printf("%q\n", token)
     op := token[0]
     args := OrgexPut{}
 
     for _, arg := range token[1:] {
         err := args.pushArg(state, arg)
         if err != nil {
-            return errors.New("Parse failed on line " + strconv.Itoa(state.PC))
+            return err
         }
     }
 
-    _, has := Ops[op]
-    if !has {
-        return errors.New("Unknown instruction")
-    }
 
-    _, has = Returning[op]
+    _, has := Returning[op]
     if !has && args.R == nil {
         state.Reg[RF] |= (1 << F_FAULT)
         //@TODO: destroy stack pointer
         return nil
     }
 
+    _, has = Ops[op]
+    if !has {
+        return errors.New("Unknown instruction `" + op + "`")
+    }
+
     state.Reg[RF] = 0
     Ops[op](&state.State, args.Orgex)
-    state.PC += 1
-
 
     return nil
 }
 
-func (org *OrgexPut) pushArg(state AsmState, arg string) error {
+func getInt(arg string) (byte, error) {
+    i, err := strconv.ParseInt(arg[1:], 16, 8)
+    return byte(i), err
+}
+
+func (org *OrgexPut) pushArg(state *AsmState, arg string) error {
 
     var res byte
-
-    number, err := strconv.ParseInt(arg[1:], 16, 8)
-    if err != nil {
-        return err
-    }
-
 
     switch arg[0] {
         //hex constant
         case '&':
-            res = byte(number)
+            var err error
+            res, err = getInt(arg)
+            if err != nil {
+                return err
+            }
         case 'R':
+            number, err := getInt(arg)
+            if err != nil {
+                return err
+            }
             if number >= 16 {
                 return errors.New("Nonexistent register usage")
             }
@@ -187,7 +195,6 @@ func tokenize(str string) []string {
 
 func argType(t []string) int {
 
-    fmt.Printf("%q\n", t)
     if len(t) < 1 || len(t[0]) < 1 {
         return OP_NOP
     }
@@ -196,7 +203,7 @@ func argType(t []string) int {
     switch {
         case first == '#' && t[0] == "#DEF" && len(t) == 3:
             return OP_CONSTANT
-        case last == ':' && len(t) == 2:
+        case last == ':' && len(t) == 1:
             return OP_LABEL
         case first == '%' || len(t[0]) == 0:
             return OP_NOP
@@ -207,7 +214,7 @@ func argType(t []string) int {
 
 func Preprocess(t []string, state *AsmState) {
     state.Const = make(map[string]int)
-    for _, s := range t {
+    for i, s := range t {
         tokens := tokenize(s)
         switch argType(tokens) {
 
@@ -215,8 +222,7 @@ func Preprocess(t []string, state *AsmState) {
 
             case OP_LABEL:
                 name := tokens[0][0:len(tokens[0])-1]
-                value, _ := strconv.Atoi(tokens[1])
-                state.Const[name] = value
+                state.Const[name] = i
 
             case OP_CONSTANT:
                 value, _ := strconv.Atoi(tokens[2])

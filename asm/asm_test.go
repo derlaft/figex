@@ -4,7 +4,7 @@ import (
     . "github.com/derlaft/figex/mio"
     "testing"
     "fmt"
-    "strconv"
+    //"strconv"
 )
 
 func TestTokenize(t *testing.T) {
@@ -13,27 +13,34 @@ func TestTokenize(t *testing.T) {
     a := tokenize(s)
 
 
-    if a[0] != "MOV" ||
-       a[1] != "AL" ||
-       a[2] != "AL" {
+    if a[0] != "MOV" || a[1] != "AL" || a[2] != "AL" {
                 t.Fail()
             }
 }
 
-func TestPreprocess(t *testing.T) {
+func TestPreprocessJump(t *testing.T) {
     prog, err := ProgFromFile("./TEST1.PER")
         if err != nil {
             fmt.Println(err)
-            t.Fail()
+                t.Fail()
+                return
         }
 
     a := AsmState{}
     Preprocess(prog.Str, &a)
+    fmt.Printf("%q\n", a.Const)
 
-    fmt.Println("Printing const table")
-    for s, i := range a.Const {
-        fmt.Println("Const " + s + " is " + strconv.Itoa(i))
+    a.PC = 10
+    fmt.Println(Cycle(prog, &a))
+        fmt.Printf("%d %q\n", a.PC, a.Reg)
+    fmt.Println(Cycle(prog, &a))
+        fmt.Printf("%d %q\n", a.PC, a.Reg)
+    if a.PC != 7 {
+        t.Fail()
+        return
     }
-
 }
+
+
+
 
