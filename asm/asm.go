@@ -1,30 +1,43 @@
 package asm
 
 import (
-    . "github.com/derlaft/figex/cpu"
-    . "github.com/derlaft/figex/mio"
-    "strings"
-    "strconv"
-    "errors"
-    "fmt"
+    //. "github.com/derlaft/figex/mio"
+    //"strconv"
 )
 
-type AsmState struct {
-    State
-    PC int
+type Args struct {
 
-    //stack for CALL/RET
-    ret [32] int
-    pt byte
-
-    Const map[string]int
+    //Op Instruction
+    Op string
+    A [2]Arg
+    Used byte
 }
 
-type OrgexPut struct {
-    Orgex
-    used int
+
+type State struct {
+    Reg [16]byte
+    Mem [256]byte
+    Ret [32]int
+    IP, pt int
+}
+
+type pargs struct {
+    op Instruction
+    A [2]byte
     jump int
+    R *byte
 }
+
+type Arg struct {
+    Type byte
+    Val int
+}
+
+const (
+    ARG_REG = 0
+    ARG_CONST = 1
+    ARG_LABEL = 2
+)
 
 // links to instruction subroutines
 var Ops = map[string]Instruction{
@@ -47,9 +60,18 @@ var Ops = map[string]Instruction{
     "ST":  St,
     "PUT": Push,
     "POP": Pop,
+    "JMP": Jmp,
+    "JZ":  Jz,
+    "JNZ": Jnz,
+    "JO":  Jo,
+    "JNO": Jno,
+    "JF":  Jf,
+    "JNF": Jnf,
+    "FNC": Call,
+    "FLT": Flt,
 }
 
-// instruction that need Orgex.R pointer to return value
+// instruction that need Args.R pointer to return value
 var Returning = map[string]bool {
     "ADD": true,
     "SUB": true,
@@ -70,179 +92,78 @@ var Returning = map[string]bool {
     "POP": true,
 }
 
-var Labels = map[string]Macros {
-    "JMP": Jmp,
-    "JZ":  Jz,
-    "JNZ": Jnz,
-    "JO":  Jo,
-    "JNO": Jno,
-    "JF":  Jf,
-    "JNF": Jnf,
-}
+const (
+  RA = 10
+  RB = 11
+  RC = 12
+  RD = 13
+  RE = 14 //stack pointer
+  RF = 15 //flag register
 
-type Macros func(*AsmState,OrgexPut)
+  F_ZERO = 0
+  F_OVER = 1
+  F_FAULT = 2
+  F_INT = 3
+)
+
+type Instruction func(*State,pargs)
 
 // @TODO: check for interrupts
 // and implement them ofc :)
 
-func Cycle(p Prog, state *AsmState) error {
-
-    var token []string
-
-    for argType(token) != OP_OP && state.PC < len(p.Str) {
-        token = tokenize(p.Str[state.PC])
-        state.PC += 1
-    }
-
-    if state.PC > len(p.Str) {
-        return errors.New("Program ended")
-    }
-
-    fmt.Printf("%q\n", token)
-    op := token[0]
-    args := OrgexPut{}
-
-    for _, arg := range token[1:] {
-        err := args.pushArg(state, arg)
-        if err != nil {
-            return err
-        }
-    }
-
-
-    _, has := Returning[op]
-    if !has && args.R == nil {
-        state.Reg[RF] |= (1 << F_FAULT)
-        //@TODO: destroy stack pointer
-        return nil
-    }
-
-    _, has = Ops[op]
-    if !has {
-        return errors.New("Unknown instruction `" + op + "`")
-    }
+func (state *State) Tick(a Args) error {
 
     state.Reg[RF] = 0
-    Ops[op](&state.State, args.Orgex)
+    pargs := a.getPargs(state)
+    pargs.op(state, pargs)
+    state.IP += 1
 
     return nil
 }
 
-func getInt(arg string) (byte, error) {
-    i, err := strconv.ParseInt(arg[1:], 16, 8)
-    return byte(i), err
+func (state *State) GetIP() int {
+    return state.IP
 }
 
-func (org *OrgexPut) pushArg(state *AsmState, arg string) error {
+func (a *Args) getPargs(s *State) pargs {
+    p := pargs{}
 
-    var res byte
+    p.op = Ops[a.Op]
 
-    switch arg[0] {
-        //hex constant
-        case '&':
-            var err error
-            res, err = getInt(arg)
-            if err != nil {
-                return err
-            }
-        case 'R':
-            number, err := getInt(arg)
-            if err != nil {
-                return err
-            }
-            if number >= 16 {
-                return errors.New("Nonexistent register usage")
-            }
-            res = state.Reg[number]
-            if org.used == 0 {
-                org.R = &state.Reg[number]
-            }
-       case '_', ':':
-            val, ok := state.Const[arg[1:]]
-            if ok && int(byte(val)) == val && arg[0] == '_' {
-                res = byte(val)
-            } else if ok && arg[0] == ':' {
-                org.jump = val
-                return nil
-            } else {
-                return errors.New("Nonexistend constant usage")
-            }
-    }
-
-    switch org.used {
-        case 0:
-            org.A = res
-        case 1:
-            org.B = res
-    }
-
-    org.used += 1
-
-    return nil
-
-}
-
-var (
-    OP_OP = 0
-    OP_LABEL = 1
-    OP_CONSTANT = 2
-    OP_NOP = -1
-)
-
-func tokenize(str string) []string {
-    return strings.Fields(str)
-}
-
-func argType(t []string) int {
-
-    if len(t) < 1 || len(t[0]) < 1 {
-        return OP_NOP
-    }
-
-    first, last := t[0][0], t[0][len(t[0])-1]
-    switch {
-        case first == '#' && t[0] == "#DEF" && len(t) == 3:
-            return OP_CONSTANT
-        case last == ':' && len(t) == 1:
-            return OP_LABEL
-        case first == '%' || len(t[0]) == 0:
-            return OP_NOP
-        default:
-            return OP_OP
-    }
-}
-
-func Preprocess(t []string, state *AsmState) {
-    state.Const = make(map[string]int)
-    for i, s := range t {
-        tokens := tokenize(s)
-        switch argType(tokens) {
-
-            //@TODO: check conv error
-
-            case OP_LABEL:
-                name := tokens[0][0:len(tokens[0])-1]
-                state.Const[name] = i
-
-            case OP_CONSTANT:
-                value, _ := strconv.Atoi(tokens[2])
-                state.Const[tokens[1]] = value
+    for i, arg := range a.A {
+        switch arg.Type {
+            case ARG_REG:
+                reg := arg.Val & 0xF
+                p.A[i] = s.Reg[reg]
+                if i == 0 {
+                    p.R = &s.Reg[reg]
+                }
+            case ARG_CONST:
+                p.A[i] = byte(arg.Val)
+            case ARG_LABEL:
+                p.jump = arg.Val
         }
     }
+
+
+    if p.R == nil && Returning[a.Op] {
+        p.op = Flt
+    }
+
+    return p
 }
 
-
-func Jmp(s *AsmState, p OrgexPut) {
-    s.PC = p.used
+func Jmp(s *State, p pargs) {
+    s.IP = p.jump
 }
 
-func JmpIfFlag(s *AsmState, p OrgexPut, flag uint, rev bool) {
-    if ( (s.Reg[RF] & (1 << flag) > 0) != rev ) {
+func JmpIfFlag(s *State, p pargs, flag uint, rev bool) {
+    if ( (s.Reg[RF] & (1 << flag) > 0) == rev ) {
         Jmp(s, p)
     }
 }
 
-func Call(s *AsmState, p OrgexPut) {
+func Call(s *State, p pargs) {
 
     if s.pt == 31 {
         s.Reg[RF] |= (1 << F_FAULT)
@@ -250,41 +171,162 @@ func Call(s *AsmState, p OrgexPut) {
     }
 
     s.pt += 1
-    s.ret[s.pt] = s.PC
-    s.PC = p.jump
+    s.Ret[s.pt] = s.IP
+    s.IP = p.jump
 }
 
-func Ret(s *AsmState, p OrgexPut) {
+func Ret(s *State, p pargs) {
 
     if s.pt == 0 {
         s.Reg[RF] |= (1 << F_FAULT)
         return
     }
 
-    s.PC = s.ret[s.pt]
+    s.IP = s.Ret[s.pt]
     s.pt -= 1
 }
 
-func Jz(s *AsmState, p OrgexPut) {
+func Jz(s *State, p pargs) {
     JmpIfFlag(s, p, F_ZERO, false)
 }
 
-func Jnz(s *AsmState, p OrgexPut) {
+func Jnz(s *State, p pargs) {
     JmpIfFlag(s, p, F_ZERO, true)
 }
 
-func Jo(s *AsmState, p OrgexPut) {
+func Jo(s *State, p pargs) {
     JmpIfFlag(s, p, F_OVER, false)
 }
 
-func Jno(s *AsmState, p OrgexPut) {
+func Jno(s *State, p pargs) {
     JmpIfFlag(s, p, F_OVER, true)
 }
 
-func Jf(s *AsmState, p OrgexPut) {
+func Jf(s *State, p pargs) {
     JmpIfFlag(s, p, F_FAULT, false)
 }
 
-func Jnf(s *AsmState, p OrgexPut) {
+func Jnf(s *State, p pargs) {
     JmpIfFlag(s, p, F_FAULT, true)
+}
+
+
+func (s *State) result(result int) byte {
+    if result < 0 {
+        result = -result
+        s.Reg[RF] |= (1 << F_FAULT)
+    }
+
+    if result > 0xFF {
+        result = result & 0xFF
+        s.Reg[RF] |= (1 << F_OVER)
+    }
+
+
+    if result == 0 {
+        s.Reg[RF] |= (1 << F_ZERO)
+    }
+
+    return byte(result)
+}
+
+
+func Add(s *State, p pargs) {
+    *p.R = s.result(int(p.A[0]) + int(p.A[1]))
+}
+
+func Sub(s *State, p pargs) {
+    *p.R = s.result(int(p.A[0]) - int(p.A[1]))
+}
+
+func Inc(s *State, p pargs) {
+    *p.R = s.result(int(p.A[0]) + 1)
+}
+
+func Dec(s *State, p pargs) {
+    *p.R = s.result(int(p.A[0]) - 1)
+}
+
+func Mul(s *State, p pargs) {
+    *p.R = s.result(int(p.A[0]) * int(p.A[1]))
+}
+
+func Div(s *State, p pargs) {
+    if p.A[1] != 0 {
+        *p.R = byte(int(p.A[0]) / int(p.A[1]))
+        s.Reg[RA] = (byte) (int(p.A[0]) % int(p.A[1]))
+    } else {
+        s.Reg[RF] |= (1 << F_FAULT)
+    }
+}
+
+func And(s *State, p pargs) {
+    *p.R = s.result(int(p.A[0] & p.A[1]))
+}
+
+func Or(s *State, p pargs) {
+    *p.R = s.result(int(p.A[0] | p.A[1]))
+}
+
+func Xor(s *State, p pargs) {
+    *p.R = s.result(int(p.A[0] ^ p.A[1]))
+}
+
+func Not(s *State, p pargs) {
+    *p.R = s.result(int(p.A[0] ^ 0xFF))
+}
+
+func Rol(s *State, p pargs) {
+    *p.R = s.result(int(p.A[0] << 1))
+}
+
+func Ror(s *State, p pargs) {
+    *p.R = s.result(int(p.A[0] >> 1))
+}
+
+func Rcl(s *State, p pargs) {
+    *p.R = s.result(int(p.A[0] << 1) | int(p.A[0] >> 7))
+}
+
+func Rcr(s *State, p pargs) {
+    *p.R = s.result(int(p.A[0] >> 1) | int(p.A[0] << 7))
+}
+
+func Mov(s *State, p pargs) {
+    *p.R = s.result(int(p.A[1]))
+}
+
+func Ld(s *State, p pargs) {
+    *p.R = s.Mem[p.A[1]]
+}
+
+func St(s *State, p pargs) {
+    s.Mem[p.A[1]] = p.A[0]
+}
+
+func Push(s *State, p pargs) {
+    if s.Reg[RE] < 128 || s.Reg[RE] > 127 + 64 {
+        s.Reg[RF] |= (1 << F_FAULT)
+    } else {
+        s.Mem[s.Reg[RE]] = p.A[0]
+        s.Reg[RE] = byte(int(s.Reg[RE]) + 1)
+    }
+}
+
+func Pop(s *State, p pargs) {
+    if s.Reg[RE] < 128 || s.Reg[RE] > 127 + 64 {
+        s.Reg[RF] |= (1 << F_FAULT)
+    } else {
+        s.Reg[RE] = byte(int(s.Reg[RE]) - 1)
+        *p.R = s.result(int(s.Mem[s.Reg[RE]]))
+    }
+}
+
+
+// Generate fault state
+func Flt(s *State, p pargs) {
+    s.Reg[RF] |= (1 << F_FAULT)
+}
+
+func Nop(s *State, p pargs) {
 }

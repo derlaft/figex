@@ -1,46 +1,32 @@
 package asm
 
 import (
-    . "github.com/derlaft/figex/mio"
     "testing"
     "fmt"
-    //"strconv"
+    "strconv"
 )
 
-func TestTokenize(t *testing.T) {
+func TestResult(t *testing.T) {
+    var good = map[int]byte {
+        42:     0,
+        15:     0,
+        250:    0,
+        -42:    (1 << F_FAULT),
+        3556:   (1 << F_OVER),
+        -4123:  (1 << F_OVER) | (1 << F_FAULT),
+        0:      (1 << F_ZERO),
+        256:    (1 << F_ZERO) | (1 << F_OVER),
+    }
 
-    s := "\t\tMOV  AL \tAL "
-    a := tokenize(s)
-
-
-    if a[0] != "MOV" || a[1] != "AL" || a[2] != "AL" {
-                t.Fail()
-            }
-}
-
-func TestPreprocessJump(t *testing.T) {
-    prog, err := ProgFromFile("./TEST1.PER")
-        if err != nil {
-            fmt.Println(err)
-                t.Fail()
-                return
+    for k, v := range good {
+        state := State{}
+        state.result(k)
+        res := state.Reg[RF]
+        if res != v {
+            fmt.Println("Test " + strconv.Itoa(k))
+            fmt.Println(strconv.Itoa(int(res)) + " != " + strconv.Itoa(int(v)))
+            t.Fail()
         }
-
-    a := AsmState{}
-    Preprocess(prog.Str, &a)
-    fmt.Printf("%q\n", a.Const)
-
-    a.PC = 10
-    fmt.Println(Cycle(prog, &a))
-        fmt.Printf("%d %q\n", a.PC, a.Reg)
-    fmt.Println(Cycle(prog, &a))
-        fmt.Printf("%d %q\n", a.PC, a.Reg)
-    if a.PC != 7 {
-        t.Fail()
-        return
     }
 }
-
-
-
 
