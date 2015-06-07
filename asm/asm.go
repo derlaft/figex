@@ -13,8 +13,8 @@ type InstHandler func(*State, Instruction)
 
 // Instruction map
 var Handlers = map[string]InstHandler {
-	// No operation
-	"NOP": Nop,
+    // No operation
+    "NOP": Nop,
     // Ariphmetic instructions
     "ADD": Add,
     "SUB": Sub,
@@ -207,7 +207,7 @@ const (
     F_EQUAL = 5
     F_GREAT = 6
 )
-	
+
 func Cmp(state *State, inst Instruction) {
     first  := inst.Args[0]
     second := inst.Args[1]
@@ -299,13 +299,13 @@ func Ret(state *State, inst Instruction) {
 
 // Dual args flags: LESS, EQUAL, GREAT
 func (state *State) flagArgs(first byte, second byte) {
-	
-	// Reset args flags
-	state.Reg[RF] &= ((1 << F_LESS)  ^ 0xFF)
-	state.Reg[RF] &= ((1 << F_EQUAL) ^ 0xFF)
-	state.Reg[RF] &= ((1 << F_GREAT) ^ 0xFF)
-	
-	// Set args flags
+
+    // Reset args flags
+    state.Reg[RF] &= ((1 << F_LESS)  ^ 0xFF)
+    state.Reg[RF] &= ((1 << F_EQUAL) ^ 0xFF)
+    state.Reg[RF] &= ((1 << F_GREAT) ^ 0xFF)
+
+    // Set args flags
     if first < second {
         state.Reg[RF] |= (1 << F_LESS)
     }
@@ -321,11 +321,11 @@ func (state *State) flagArgs(first byte, second byte) {
 
 // Result flags: OVER, FAULT, ZERO
 func (state *State) flagResult(result int) byte {
-	
-	// Reset args flags
-	state.Reg[RF] &= ((1 << F_FAULT) ^ 0xFF)
-	state.Reg[RF] &= ((1 << F_OVER)  ^ 0xFF)
-	state.Reg[RF] &= ((1 << F_ZERO)  ^ 0xFF)
+
+    // Reset args flags
+    state.Reg[RF] &= ((1 << F_FAULT) ^ 0xFF)
+    state.Reg[RF] &= ((1 << F_OVER)  ^ 0xFF)
+    state.Reg[RF] &= ((1 << F_ZERO)  ^ 0xFF)
 
     // Check byte bounds
     if result < 0 {
@@ -379,10 +379,10 @@ func Div(state *State, inst Instruction) {
     first  := inst.Args[0]
     second := inst.Args[1]
     state.flagArgs(first, second)
-    
+
     if inst.Args[1] == 0 {
-		// Divide by zero fault
-		state.Reg[RF] |= (1 << F_FAULT)
+        // Divide by zero fault
+        state.Reg[RF] |= (1 << F_FAULT)
     } else {
         *inst.RetPtr = state.flagResult(int(inst.Args[0]) / int(inst.Args[1]))
         state.Reg[RA] = (byte) (int(inst.Args[0]) % int(inst.Args[1]))
@@ -432,7 +432,7 @@ func Rcr(state *State, inst Instruction) {
 
 // Data move
 func Mov(state *State, inst Instruction) {
-	first  := inst.Args[0]
+    first  := inst.Args[0]
     second := inst.Args[1]
     state.flagArgs(first, second)
     *inst.RetPtr = state.flagResult(int(second))
@@ -443,7 +443,7 @@ func Ld(state *State, inst Instruction) {
 }
 
 func St(state *State, inst Instruction) {
-	state.flagResult(int(inst.Args[0]))
+    state.flagResult(int(inst.Args[0]))
     state.Mem[inst.Args[1]] = inst.Args[0]
 }
 
@@ -452,7 +452,7 @@ func Push(state *State, inst Instruction) {
     if state.Reg[RSP] < 128 || state.Reg[RSP] > 127 + 64 {
         state.Reg[RF] |= (1 << F_FAULT)
     } else {
-		state.flagResult(int(inst.Args[0]))
+        state.flagResult(int(inst.Args[0]))
         state.Mem[state.Reg[RSP]] = inst.Args[0]
         state.Reg[RSP] = byte(int(state.Reg[RSP]) + 1)
     }
@@ -462,12 +462,11 @@ func Pop(state *State, inst Instruction) {
     if state.Reg[RSP] < 128 || state.Reg[RSP] > 127 + 64 {
         state.Reg[RF] |= (1 << F_FAULT)
     } else {
-		state.flagResult(int(inst.Args[0]))
+        state.flagResult(int(inst.Args[0]))
         state.Reg[RSP] = byte(int(state.Reg[RSP]) - 1)
         *inst.RetPtr= state.flagResult(int(state.Mem[state.Reg[RSP]]))
     }
 }
-
 
 // Generate fault state
 func Flt(state *State, inst Instruction) {
