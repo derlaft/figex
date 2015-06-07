@@ -168,7 +168,6 @@ const (
 // Digital machine cycle
 func (state *State) Cycle(cmd Command) error {
 
-    // state.Reg[RF] = 0 //WARNING: flush RF before EACH instrution not good way
     inst := cmd.toInstruction(state)
     inst.handler(state, inst)
     state.IP += 1
@@ -293,7 +292,13 @@ func Ret(state *State, inst Instruction) {
 
 // Dual args flags: LESS, EQUAL, GREAT
 func (state *State) flagArgs(first byte, second byte) {
-
+	
+	// Reset args flags
+	state.Reg[RF] &= ((1 << F_LESS)  ^ 0xFF)
+	state.Reg[RF] &= ((1 << F_EQUAL) ^ 0xFF)
+	state.Reg[RF] &= ((1 << F_GREAT) ^ 0xFF)
+	
+	// Set args flags
     if first < second {
         state.Reg[RF] |= (1 << F_LESS)
     }
@@ -307,8 +312,13 @@ func (state *State) flagArgs(first byte, second byte) {
     }
 }
 
-// Range flags: OVER, FAULT, ZERO
+// Result flags: OVER, FAULT, ZERO
 func (state *State) flagResult(result int) byte {
+	
+	// Reset args flags
+	state.Reg[RF] &= ((1 << F_FAULT) ^ 0xFF)
+	state.Reg[RF] &= ((1 << F_OVER)  ^ 0xFF)
+	state.Reg[RF] &= ((1 << F_ZERO)  ^ 0xFF)
 
     // Check byte bounds
     if result < 0 {
@@ -329,74 +339,64 @@ func (state *State) flagResult(result int) byte {
     return byte(result)
 }
 
-
 func Add(state *State, inst Instruction) {
-    state.Reg[RF] = 0
     first  := inst.Args[0]
     second := inst.Args[1]
     state.flagArgs(first, second)
-    *inst.RetPtr= state.flagResult(int(first) + int(second))
+    *inst.RetPtr = state.flagResult(int(first) + int(second))
 }
 
 func Sub(state *State, inst Instruction) {
-    state.Reg[RF] = 0
     first  := inst.Args[0]
     second := inst.Args[1]
     state.flagArgs(first, second)
-    *inst.RetPtr= state.flagResult(int(first) - int(second))
+    *inst.RetPtr = state.flagResult(int(first) - int(second))
 }
 
 func Inc(state *State, inst Instruction) {
-    state.Reg[RF] = 0
-    *inst.RetPtr= state.flagResult(int(inst.Args[0]) + 1)
+    *inst.RetPtr = state.flagResult(int(inst.Args[0]) + 1)
 }
 
 func Dec(state *State, inst Instruction) {
-    state.Reg[RF] = 0
-    *inst.RetPtr= state.flagResult(int(inst.Args[0]) - 1)
+    *inst.RetPtr = state.flagResult(int(inst.Args[0]) - 1)
 }
 
 func Mul(state *State, inst Instruction) {
-    state.Reg[RF] = 0
     first  := inst.Args[0]
     second := inst.Args[1]
     state.flagArgs(first, second)
-    *inst.RetPtr= state.flagResult(int(first) * int(second))
+    *inst.RetPtr = state.flagResult(int(first) * int(second))
 }
 
 func Div(state *State, inst Instruction) {
-    state.Reg[RF] = 0
     first  := inst.Args[0]
     second := inst.Args[1]
     state.flagArgs(first, second)
     
-    // FIXME
-    if inst.Args[1] != 0 {
-        *inst.RetPtr= byte(int(inst.Args[0]) / int(inst.Args[1]))
-        state.Reg[RA] = (byte) (int(inst.Args[0]) % int(inst.Args[1]))
+    if inst.Args[1] == 0 {
+		// Divide by zero fault
+		state.Reg[RF] |= (1 << F_FAULT)
     } else {
-        state.Reg[RF] |= (1 << F_FAULT)
+        *inst.RetPtr = state.flagResult(int(inst.Args[0]) / int(inst.Args[1]))
+        state.Reg[RA] = (byte) (int(inst.Args[0]) % int(inst.Args[1]))
     }
 }
 
 func And(state *State, inst Instruction) {
-    state.Reg[RF] = 0
     first  := inst.Args[0]
     second := inst.Args[1]
     state.flagArgs(first, second)
-    *inst.RetPtr= state.flagResult(int(first) & int(second))
+    *inst.RetPtr = state.flagResult(int(first) & int(second))
 }
 
 func Or(state *State, inst Instruction) {
-    state.Reg[RF] = 0
     first  := inst.Args[0]
     second := inst.Args[1]
     state.flagArgs(first, second)
-    *inst.RetPtr= state.flagResult(int(first) | int(second))
+    *inst.RetPtr = state.flagResult(int(first) | int(second))
 }
 
 func Xor(state *State, inst Instruction) {
-    state.Reg[RF] = 0
     first  := inst.Args[0]
     second := inst.Args[1]
     state.flagArgs(first, second)
@@ -404,41 +404,40 @@ func Xor(state *State, inst Instruction) {
 }
 
 func Not(state *State, inst Instruction) {
-    state.Reg[RF] = 0
-    *inst.RetPtr= state.flagResult(int(inst.Args[0] ^ 0xFF))
+    *inst.RetPtr = state.flagResult(int(inst.Args[0] ^ 0xFF))
 }
 
 func Rol(state *State, inst Instruction) {
-    state.Reg[RF] = 0
-    *inst.RetPtr= state.flagResult(int(inst.Args[0] << 1))
+    *inst.RetPtr = state.flagResult(int(inst.Args[0] << 1))
 }
 
 func Ror(state *State, inst Instruction) {
-    state.Reg[RF] = 0
-    *inst.RetPtr= state.flagResult(int(inst.Args[0] >> 1))
+    *inst.RetPtr = state.flagResult(int(inst.Args[0] >> 1))
 }
 
 func Rcl(state *State, inst Instruction) {
-    state.Reg[RF] = 0
-    *inst.RetPtr= state.flagResult(int(inst.Args[0] << 1) | int(inst.Args[0] >> 7))
+    *inst.RetPtr = state.flagResult(int(inst.Args[0] << 1) | int(inst.Args[0] >> 7))
 }
 
 func Rcr(state *State, inst Instruction) {
-    state.Reg[RF] = 0
-    *inst.RetPtr= state.flagResult(int(inst.Args[0] >> 1) | int(inst.Args[0] << 7))
+    *inst.RetPtr = state.flagResult(int(inst.Args[0] >> 1) | int(inst.Args[0] << 7))
 }
 
 // Data move
 
 func Mov(state *State, inst Instruction) {
-    *inst.RetPtr= state.flagResult(int(inst.Args[1]))
+	first  := inst.Args[0]
+    second := inst.Args[1]
+    state.flagArgs(first, second)
+    *inst.RetPtr = state.flagResult(int(second))
 }
 
 func Ld(state *State, inst Instruction) {
-    *inst.RetPtr= state.Mem[inst.Args[1]]
+    *inst.RetPtr = state.flagResult(int(state.Mem[inst.Args[1]]))
 }
 
 func St(state *State, inst Instruction) {
+	state.flagResult(int(inst.Args[0]))
     state.Mem[inst.Args[1]] = inst.Args[0]
 }
 
@@ -448,6 +447,7 @@ func Push(state *State, inst Instruction) {
     if state.Reg[RSP] < 128 || state.Reg[RSP] > 127 + 64 {
         state.Reg[RF] |= (1 << F_FAULT)
     } else {
+		state.flagResult(int(inst.Args[0]))
         state.Mem[state.Reg[RSP]] = inst.Args[0]
         state.Reg[RSP] = byte(int(state.Reg[RSP]) + 1)
     }
@@ -457,6 +457,7 @@ func Pop(state *State, inst Instruction) {
     if state.Reg[RSP] < 128 || state.Reg[RSP] > 127 + 64 {
         state.Reg[RF] |= (1 << F_FAULT)
     } else {
+		state.flagResult(int(inst.Args[0]))
         state.Reg[RSP] = byte(int(state.Reg[RSP]) - 1)
         *inst.RetPtr= state.flagResult(int(state.Mem[state.Reg[RSP]]))
     }
@@ -470,4 +471,5 @@ func Flt(state *State, inst Instruction) {
 
 // Nop-nop-nop
 func Nop(state *State, inst Instruction) {
+	// NO OPERATION
 }
