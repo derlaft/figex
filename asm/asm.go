@@ -13,6 +13,8 @@ type InstHandler func(*State, Instruction)
 
 // Instruction map
 var Handlers = map[string]InstHandler {
+	// No operation
+	"NOP": Nop,
     // Ariphmetic instructions
     "ADD": Add,
     "SUB": Sub,
@@ -185,7 +187,6 @@ func (state *State) GetIP() int {
 //
 
 // JUMPS
-
 func Jmp(state *State, inst Instruction) {
     state.IP = inst.JumpAddr
 }
