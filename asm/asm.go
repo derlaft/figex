@@ -38,7 +38,7 @@ var Handlers = map[string]InstHandler {
     "PUT": Push,
     "POP": Pop,
     // Compare instruction
-//    "CMP": Cmp,
+    "CMP": Cmp,
     // Jumps instructions
     "JZ":  Jz,
     "JNZ": Jnz,
@@ -206,6 +206,12 @@ const (
     F_EQUAL = 5
     F_GREAT = 6
 )
+	
+func Cmp(state *State, inst Instruction) {
+    first  := inst.Args[0]
+    second := inst.Args[1]
+    state.flagArgs(first, second)
+}
 
 func Jz(state *State, inst Instruction) {
     JmpIfFlag(state, inst, F_ZERO, false)
@@ -424,7 +430,6 @@ func Rcr(state *State, inst Instruction) {
 }
 
 // Data move
-
 func Mov(state *State, inst Instruction) {
 	first  := inst.Args[0]
     second := inst.Args[1]
@@ -442,7 +447,6 @@ func St(state *State, inst Instruction) {
 }
 
 // Stack
-
 func Push(state *State, inst Instruction) {
     if state.Reg[RSP] < 128 || state.Reg[RSP] > 127 + 64 {
         state.Reg[RF] |= (1 << F_FAULT)
