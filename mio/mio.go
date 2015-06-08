@@ -11,7 +11,7 @@ import (
 )
 
 type Prog struct {
-    Prog []Args
+    Prog []Command
     Const map[string]int
 }
 
@@ -59,7 +59,7 @@ func ProgFromFile(path string) (prog Prog, err error) {
 
 func preprocess(str []string) (prog Prog) {
     prog.Const = make(map[string]int)
-    prog.Prog = make([]Args, 64, MAXLEN)
+    prog.Prog = make([]Command, 64, MAXLEN)
 
     n := 0
 
@@ -100,19 +100,19 @@ func preprocess(str []string) (prog Prog) {
 }
 
 func isRealOp(name string) bool {
-    _, contains := Ops[name]
+    _, contains := Handlers[name]
 
     return contains
 }
 
 
-func parseOp(prog *Prog, tokens []string) (args Args) {
+func parseOp(prog *Prog, tokens []string) (args Command) {
 
     for _, arg := range tokens[1:] {
-        args.Op = tokens[0]
+        args.InstName = tokens[0]
         err := pushArg(&args, prog, arg)
         if err != nil {
-            args.Op = "FLT"
+            args.InstName = "FLT"
             return
         }
     }
@@ -144,7 +144,7 @@ func tokenize(str string) []string {
         return strings.Fields(str)
 }
 
-func pushArg(org *Args, prog *Prog, arg string) error {
+func pushArg(org *Command, prog *Prog, arg string) error {
 
     var res byte
 
@@ -183,8 +183,8 @@ func pushArg(org *Args, prog *Prog, arg string) error {
     return nil
 }
 
-func push(a *Args, t byte, val int) {
-    a.A[a.Used] = Arg{t, val}
+func push(a *Command, t byte, val int) {
+    a.Args[a.Used] = Argument{t, val}
     a.Used += 1
 }
 
