@@ -27,14 +27,14 @@ func main() {
     scanner := bufio.NewScanner(os.Stdin)
 
     for i, in := range prog.Prog {
-        fmt.Println(i, in.Op)
+        fmt.Println(i, in.InstName)
     }
 
     for scanner.Scan() && state.GetIP() < len(prog.Prog) {
         args := prog.Prog[state.GetIP()]
-        state.Tick(args)
+        state.Cycle(args)
         fmt.Printf("%q\n", state.Reg)
-        fmt.Printf("%s\n", args.Op)
+        fmt.Printf("%s\n", args.InstName)
     }
 
 }
